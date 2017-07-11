@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <group android:checkableBehavior="single">
+        <item
+            android:id="@+id/nav_controller"
+            android:title="Controller" />
+        <item
+            android:id="@+id/nav_devices"
+            android:title="Devices" />
+        <item
+            android:id="@+id/nav_debug"
+            android:title="Deug Terminal" />
+    </group>
+
+</menu>

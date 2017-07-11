@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="colorPrimary">#3F51B5</color>
+    <color name="colorPrimaryDark">#303F9F</color>
+    <color name="colorAccent">#FF4081</color>
+    <color name="colorWhite">#d2d2d2</color>
+    <color name="colorOn">#1c8e1a</color>
+    <color name="colorOff">#4a4b4a</color>
+    <color name="colorSNESBlue">#0028ca</color>
+    <color name="colorSNESGreen">#1d8500</color>
+    <color name="colorSNESBYellow">#dbcb1a</color>
+    <color name="colorSNESRed">#bf1818</color>
+    <color name="colorSNESYellow">#dbcb1a</color>
+</resources>

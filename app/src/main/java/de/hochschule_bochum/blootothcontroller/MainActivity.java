@@ -47,7 +47,9 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     private ActionBarDrawerToggle drawerToggle;
     private MenuItem connectBtn;
     private Debugger debugger;
+    private Vibrator vibrator;
     private TextView statusView;
+    private boolean vibrated = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -66,6 +68,8 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         NavigationView navigationView = (NavigationView) findViewById(R.id.nav_view);
         navigationView.setNavigationItemSelectedListener(this);
         navigationView.setCheckedItem(0);
+
+        vibrator = (Vibrator) getApplicationContext().getSystemService(VIBRATOR_SERVICE);
 
         debugger = new Debugger();
 
@@ -102,6 +106,14 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                             int score = jsonData.has("highscore") ? jsonData.getInt("highscore") : 0;
                             int level = jsonData.has("level") ? jsonData.getInt("level") : 1;
                             setStatusView(gamestate, score, level);
+                            if (gamestate.equals("gameover") && !vibrated) {
+                                vibrated = true;
+                                long[] pattern = {0, 100, 500, 100, 500, 100, 500, 100, 500, 100, 500};
+                                vibrator.vibrate(pattern, -1);
+                                Log.d(TAG, "onDataReceived: Vibrated");
+                            } else if (!gamestate.equals("gameover")) {
+                                vibrated = false;
+                            }
                             break;
                     }
                 } catch (JSONException e) {
@@ -279,7 +291,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
     private void setStatusView(String gamestate, int score, int level) {
         if (statusView == null) return;
-        String text = "Spielstatus";
+        String text = "Spielstatus\n";
         text += "Status: " + gamestate + "\n";
         text += "Score: " + score + "\n";
         text += "Level: " + level + "\n";
@@ -321,7 +333,6 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             if (spp.getServiceState() != BluetoothState.STATE_CONNECTED) return false;
             states.put(v.getId(), event.getAction());
             if (event.getAction() == MotionEvent.ACTION_DOWN) {
-                Vibrator vibrator = (Vibrator) getApplicationContext().getSystemService(VIBRATOR_SERVICE);
                 vibrator.vibrate(35);
             }
 

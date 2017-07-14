@@ -47,6 +47,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     private ActionBarDrawerToggle drawerToggle;
     private MenuItem connectBtn;
     private Debugger debugger;
+    private TextView statusView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -91,6 +92,22 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             @Override
             public void onDataReceived(byte[] data, String message) {
                 debugger.log(message);
+                try {
+                    JSONObject jsonData = new JSONObject(message);
+                    if (!jsonData.has("protocol")) return;
+                    switch (jsonData.getInt("protocol")) {
+                        case 2:
+                            if (statusView == null) return;
+                            String gamestate = jsonData.has("status") ? jsonData.getString("status") : "unknown";
+                            int score = jsonData.has("highscore") ? jsonData.getInt("highscore") : 0;
+                            int level = jsonData.has("level") ? jsonData.getInt("level") : 1;
+                            setStatusView(gamestate, score, level);
+                            break;
+                    }
+                } catch (JSONException e) {
+                    Log.d("OnReceive", null, e);
+                }
+
             }
         });
 
@@ -135,11 +152,14 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     public boolean onNavigationItemSelected(@NonNull MenuItem item) {
         // Handle navigation view item clicks here.
         int id = item.getItemId();
+        statusView = null;
         if (id == R.id.nav_controller) {
             Toast.makeText(this, "Controller", Toast.LENGTH_SHORT).show();
             connectBtn.setVisible(true);
             setContent(R.layout.content_controller);
             debugger.updateViews();
+
+            statusView = (TextView) findViewById(R.id.statusview);
 
             Button btnStart = (Button) findViewById(R.id.btnStart);
             Button btnSelect = (Button) findViewById(R.id.btnSelect);
@@ -257,6 +277,16 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         drawer.closeDrawers();
     }
 
+    private void setStatusView(String gamestate, int score, int level) {
+        if (statusView == null) return;
+        String text = "Spielstatus";
+        text += "Status: " + gamestate + "\n";
+        text += "Score: " + score + "\n";
+        text += "Level: " + level + "\n";
+
+        statusView.setText(text);
+    }
+
     public class ControllerListener implements View.OnTouchListener {
 
         private Button btnStart;
@@ -298,6 +328,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             JSONObject json = new JSONObject();
 
             try {
+                json.put("protocol", 1);
                 json.put("start", isTouched(btnStart));
                 json.put("select", isTouched(btnSelect));
                 json.put("up", isTouched(btnUp));

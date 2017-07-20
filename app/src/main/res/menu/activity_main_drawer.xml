@@ -7,9 +7,15 @@
             android:title="Controller" />
         <item
             android:id="@+id/nav_devices"
+            android:icon="@drawable/ic_stay_current_portrait_black_24dp"
             android:title="Devices" />
         <item
+            android:id="@+id/nav_highscore"
+            android:icon="@android:drawable/btn_star_big_on"
+            android:title="Highscore" />
+        <item
             android:id="@+id/nav_debug"
+            android:icon="@android:drawable/ic_menu_manage"
             android:title="Deug Terminal" />
     </group>
 

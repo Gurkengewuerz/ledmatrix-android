@@ -1,4 +1,4 @@
-package de.hochschule_bochum.blootothcontroller;
+package de.hochschule_bochum.blootothcontroller.objects;
 
 /**
  * Created by nikla on 08.07.2017.

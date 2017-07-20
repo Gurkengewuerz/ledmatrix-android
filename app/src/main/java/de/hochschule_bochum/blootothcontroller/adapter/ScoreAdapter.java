@@ -1,4 +1,4 @@
-package de.hochschule_bochum.blootothcontroller;
+package de.hochschule_bochum.blootothcontroller.adapter;
 
 import android.content.Context;
 import android.database.DataSetObserver;
@@ -10,17 +10,23 @@ import android.widget.TextView;
 
 import java.util.ArrayList;
 
-/**6
+import de.hochschule_bochum.blootothcontroller.R;
+import de.hochschule_bochum.blootothcontroller.objects.HighscoreList;
+import de.hochschule_bochum.blootothcontroller.objects.Score;
+
+/**
+ * 6
  * Created by nikla on 08.07.2017.
  */
 
-public class DeviceAdapter implements ListAdapter {
+public class ScoreAdapter implements ListAdapter {
 
-    private ArrayList<BTDevice> devices;
+    private HighscoreList list;
     private Context context;
+    private String game = "";
 
-    public DeviceAdapter(Context context, ArrayList<BTDevice> devices) {
-        this.devices = devices;
+    public ScoreAdapter(Context context, HighscoreList list) {
+        this.list = list;
         this.context = context;
     }
 
@@ -31,7 +37,7 @@ public class DeviceAdapter implements ListAdapter {
 
     @Override
     public boolean isEnabled(int position) {
-        return !((BTDevice) getItem(position)).isSelected();
+        return true;
     }
 
     @Override
@@ -46,12 +52,12 @@ public class DeviceAdapter implements ListAdapter {
 
     @Override
     public int getCount() {
-        return devices.size();
+        return list.get(game).size();
     }
 
     @Override
     public Object getItem(int position) {
-        return devices.get(position);
+        return list.get(game).get(position);
     }
 
     @Override
@@ -68,18 +74,12 @@ public class DeviceAdapter implements ListAdapter {
     public View getView(int position, View convertView, ViewGroup parent) {
         if (convertView == null) {
             LayoutInflater inflater = (LayoutInflater) context.getSystemService(Context.LAYOUT_INFLATER_SERVICE);
-            convertView = inflater.inflate(R.layout.row, null);
+            convertView = inflater.inflate(R.layout.row_score, null);
         }
 
-        BTDevice d = (BTDevice) getItem(position);
-        ((TextView) convertView.findViewById(R.id.toptext)).setText(d.getDeviceName());
-        ((TextView) convertView.findViewById(R.id.bottomtext)).setText(d.getMac());
-
-        if (d.isSelected()) {
-            convertView.findViewById(R.id.icon).setBackgroundColor(context.getResources().getColor(R.color.colorOn));
-        } else {
-            convertView.findViewById(R.id.icon).setBackgroundColor(context.getResources().getColor(R.color.colorOff));
-        }
+        Score score = (Score) getItem(position);
+        ((TextView) convertView.findViewById(R.id.score_text)).setText(String.valueOf(score.getScore()));
+        ((TextView) convertView.findViewById(R.id.username_text)).setText(score.getUser());
         return convertView;
     }
 
@@ -95,6 +95,15 @@ public class DeviceAdapter implements ListAdapter {
 
     @Override
     public boolean isEmpty() {
-        return devices.isEmpty();
+        return list.get(game).isEmpty();
+    }
+
+    public void setGame(String game) {
+        this.game = game;
+    }
+
+    public void selectFirstGame() {
+        ArrayList<String> games = list.getGames();
+        if (!games.isEmpty()) this.game = games.get(0);
     }
 }

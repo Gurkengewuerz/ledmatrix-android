@@ -1,9 +1,12 @@
 package de.hochschule_bochum.blootothcontroller;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
+import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.os.Vibrator;
 import android.support.annotation.NonNull;
@@ -21,40 +24,65 @@ import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
 import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ListView;
 import android.widget.ScrollView;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.Set;
 
 import app.akexorcist.bluetotohspp.library.BluetoothSPP;
 import app.akexorcist.bluetotohspp.library.BluetoothState;
+import de.hochschule_bochum.blootothcontroller.adapter.DeviceAdapter;
+import de.hochschule_bochum.blootothcontroller.adapter.ScoreAdapter;
 import de.hochschule_bochum.blootothcontroller.fragments.FragmentMgr;
+import de.hochschule_bochum.blootothcontroller.objects.BTDevice;
+import de.hochschule_bochum.blootothcontroller.objects.GameStatus;
+import de.hochschule_bochum.blootothcontroller.objects.HighscoreList;
+import de.hochschule_bochum.blootothcontroller.objects.Score;
+import okhttp3.Call;
+import okhttp3.Callback;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
 
 public class MainActivity extends AppCompatActivity implements NavigationView.OnNavigationItemSelectedListener {
 
+    public static final String API_SERVER = "http://192.168.67.72:8081";
     private static final String TAG = "BluetoothController";
+    private GameStatus gamestatus;
     private BTDevice selectedDevice = new BTDevice("", "");
     public static BluetoothSPP spp;
     private DrawerLayout drawer;
     private ActionBarDrawerToggle drawerToggle;
     private MenuItem connectBtn;
     private Debugger debugger;
-    private Vibrator vibrator;
+    public static Vibrator vibrator;
     private TextView statusView;
-    private boolean vibrated = false;
+    private AlertDialog gamedialog;
+    private ScoreAdapter scoreAdapter;
+    private HighscoreList scoreList;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        SharedPreferences load = getSharedPreferences("led-matrix-table", 0);
+
+        gamestatus = new GameStatus();
+        gamestatus.setUsername(load.getString("username", ""));
 
         if (getSupportActionBar() != null) {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
@@ -83,6 +111,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
             public void onDeviceDisconnected() {
                 connectBtn.setIcon(R.drawable.ic_play_arrow_black_24dp);
+                gamestatus.setGame("");
                 debugger.log("Disconnected");
             }
 
@@ -100,19 +129,21 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                     JSONObject jsonData = new JSONObject(message);
                     if (!jsonData.has("protocol")) return;
                     switch (jsonData.getInt("protocol")) {
-                        case 2:
+                        case 2: // Status Protocol
+
                             if (statusView == null) return;
                             String gamestate = jsonData.has("status") ? jsonData.getString("status") : "unknown";
+                            gamestatus.setStatus(GameStatus.Status.fromString(gamestate));
                             int score = jsonData.has("highscore") ? jsonData.getInt("highscore") : 0;
+                            gamestatus.setHighscore(score);
                             int level = jsonData.has("level") ? jsonData.getInt("level") : 1;
+                            gamestatus.setLevel(level);
                             setStatusView(gamestate, score, level);
-                            if (gamestate.equals("gameover") && !vibrated) {
-                                vibrated = true;
-                                long[] pattern = {0, 100, 500, 100, 500, 100, 500, 100, 500, 100, 500};
-                                vibrator.vibrate(pattern, -1);
-                                Log.d(TAG, "onDataReceived: Vibrated");
-                            } else if (!gamestate.equals("gameover")) {
-                                vibrated = false;
+                            JSONArray games = jsonData.has("games") ? jsonData.getJSONArray("games") : new JSONArray();
+                            if (games.length() > 0) {
+                                for (int i = 0, count = games.length(); i < count; i++) {
+                                    gamestatus.addGame(games.getString(i));
+                                }
                             }
                             break;
                     }
@@ -123,6 +154,9 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             }
         });
 
+        scoreList = new
+
+                HighscoreList();
     }
 
     public void reloadDevices() {
@@ -166,7 +200,6 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         int id = item.getItemId();
         statusView = null;
         if (id == R.id.nav_controller) {
-            Toast.makeText(this, "Controller", Toast.LENGTH_SHORT).show();
             connectBtn.setVisible(true);
             setContent(R.layout.content_controller);
             debugger.updateViews();
@@ -184,6 +217,48 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             Button btnX = (Button) findViewById(R.id.btnX);
             Button btnY = (Button) findViewById(R.id.btnY);
 
+            Button btnSelectGame = (Button) findViewById(R.id.selectGame);
+
+            btnSelectGame.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if (spp.getServiceState() != BluetoothState.STATE_CONNECTED) return;
+                    if (gamedialog == null || !gamedialog.isShowing()) {
+                        ArrayList<String> gameList = gamestatus.getGameList();
+                        if (gameList.size() > 0) {
+                            final String[] stringGames = new String[gameList.size()];
+                            for (int i = 0; i < gameList.size(); i++) {
+                                stringGames[i] = gameList.get(i);
+                            }
+
+                            AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this);
+                            builder.setTitle("Choose a game");
+
+                            builder.setItems(stringGames, new DialogInterface.OnClickListener() {
+                                @Override
+                                public void onClick(DialogInterface dialog, int which) {
+                                    gamestatus.setGame(stringGames[which]);
+                                    JSONObject json = new JSONObject();
+
+                                    try {
+                                        json.put("protocol", 3);
+                                        json.put("game", gamestatus.getSelectedGame());
+                                        json.put("username", gamestatus.getUsername());
+                                    } catch (JSONException e) {
+                                        Log.d("sendSelectedGame", null, e);
+                                    }
+                                    debugger.log(json.toString());
+                                    spp.send(json.toString(), true);
+                                }
+                            });
+
+                            gamedialog = builder.create();
+                            gamedialog.show();
+                        }
+                    }
+                }
+            });
+
             ControllerListener listener = new ControllerListener(btnStart, btnSelect, btnUp, btnDown, btnLeft, btnRight, btnA, btnB, btnX, btnY);
 
             btnStart.setOnTouchListener(listener);
@@ -197,7 +272,6 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             btnX.setOnTouchListener(listener);
             btnY.setOnTouchListener(listener);
         } else if (id == R.id.nav_devices) {
-            Toast.makeText(this, "Devices", Toast.LENGTH_SHORT).show();
             connectBtn.setVisible(false);
             setContent(R.layout.content_device);
             reloadDevices();
@@ -212,7 +286,6 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                 }
             });
         } else if (id == R.id.nav_debug) {
-            Toast.makeText(this, "Debugging", Toast.LENGTH_SHORT).show();
             connectBtn.setVisible(true);
             setContent(R.layout.content_debug);
 
@@ -229,6 +302,87 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                     spp.send(text, true);
                     debugger.log(text);
                     sendText.setText("");
+                }
+            });
+        } else if (id == R.id.nav_highscore) {
+            connectBtn.setVisible(true);
+            setContent(R.layout.content_highscore);
+
+            final ListView scoreListView = (ListView) findViewById(R.id.score);
+            final EditText useUsername = (EditText) findViewById(R.id.username);
+            final Button usernameButton = (Button) findViewById(R.id.set_username);
+            final Spinner gameList = (Spinner) findViewById(R.id.gamelist);
+
+            OkHttpClient client = new OkHttpClient();
+            Request request = new Request.Builder().url(API_SERVER).build();
+            client.newCall(request).enqueue(new Callback() {
+                @Override
+                public void onFailure(Call call, IOException e) {
+                    Log.e(TAG, null, e);
+                }
+
+                @Override
+                public void onResponse(Call call, Response response) throws IOException {
+                    if (!response.isSuccessful()) return;
+                    final String responseData = response.body().string();
+                    scoreList.clear();
+                    try {
+                        JSONObject json = new JSONObject(responseData);
+                        System.out.println(responseData);
+                        Iterator<String> temp = json.keys();
+                        while (temp.hasNext()) {
+                            String game = temp.next();
+                            JSONArray gameList = json.getJSONArray(game);
+
+                            for (int i = 0; i < gameList.length(); i++) {
+                                JSONObject player = gameList.getJSONObject(i);
+                                scoreList.add(game, new Score(player.getString("user"), player.getInt("score"), player.getInt("created")));
+                            }
+                        }
+
+                        MainActivity.this.runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                scoreAdapter = new ScoreAdapter(getApplicationContext(), scoreList);
+                                scoreAdapter.selectFirstGame();
+
+                                ArrayAdapter<String> adapter = new ArrayAdapter<>(MainActivity.this, android.R.layout.simple_spinner_item, scoreList.getGamesArray());
+                                gameList.setAdapter(adapter);
+
+                                scoreListView.setAdapter(scoreAdapter);
+                                scoreListView.deferNotifyDataSetChanged();
+                            }
+                        });
+
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+                    }
+                }
+            });
+
+            gameList.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+                @Override
+                public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                    if (scoreAdapter != null)
+                        scoreAdapter.setGame(parent.getItemAtPosition(position).toString());
+                    scoreListView.setAdapter(scoreAdapter);
+                    scoreListView.deferNotifyDataSetChanged();
+                }
+
+                @Override
+                public void onNothingSelected(AdapterView<?> parent) {
+
+                }
+            });
+
+            useUsername.setText(gamestatus.getUsername());
+
+            usernameButton.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    SharedPreferences save = getSharedPreferences("led-matrix-table", 0);
+                    gamestatus.setUsername(useUsername.getText().toString());
+                    save.edit().putString("username", gamestatus.getUsername()).apply();
                 }
             });
         }
@@ -274,7 +428,8 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                     spp.setupService();
                     spp.startService(BluetoothState.DEVICE_OTHER);
                 }
-                if (spp.getServiceState() == BluetoothState.STATE_CONNECTED) spp.disconnect();
+                if (spp.getServiceState() == BluetoothState.STATE_CONNECTED)
+                    spp.disconnect();
                 else spp.connect(selectedDevice.getMac());
                 return true;
         }

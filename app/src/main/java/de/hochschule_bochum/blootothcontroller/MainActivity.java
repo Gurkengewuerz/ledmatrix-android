@@ -59,7 +59,6 @@ import okhttp3.Response;
 
 public class MainActivity extends AppCompatActivity implements NavigationView.OnNavigationItemSelectedListener {
 
-    public static final String API_SERVER = "http://192.168.67.72:8081";
     private static final String TAG = "BluetoothController";
     private GameStatus gamestatus;
     private BTDevice selectedDevice = new BTDevice("", "");
@@ -73,13 +72,16 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     private AlertDialog gamedialog;
     private ScoreAdapter scoreAdapter;
     private HighscoreList scoreList;
+    private SharedPreferences load;
+    private String apiURL;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        SharedPreferences load = getSharedPreferences("led-matrix-table", 0);
+        load = getSharedPreferences("led-matrix-table", 0);
+        apiURL = load.getString("api_url", "127.0.0.1");
 
         gamestatus = new GameStatus();
         gamestatus.setUsername(load.getString("username", ""));
@@ -144,6 +146,13 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                                 for (int i = 0, count = games.length(); i < count; i++) {
                                     gamestatus.addGame(games.getString(i));
                                 }
+                            }
+
+                            String newAPIURL = jsonData.has("api_url") ? jsonData.getString("api_url") : "127.0.0.1";
+                            if(!apiURL.equals(newAPIURL)) {
+                                SharedPreferences save = getSharedPreferences("led-matrix-table", 0);
+                                apiURL = newAPIURL;
+                                save.edit().putString("api_url", newAPIURL).apply();
                             }
                             break;
                     }
@@ -314,7 +323,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             final Spinner gameList = (Spinner) findViewById(R.id.gamelist);
 
             OkHttpClient client = new OkHttpClient();
-            Request request = new Request.Builder().url(API_SERVER).build();
+            Request request = new Request.Builder().url(apiURL).build();
             client.newCall(request).enqueue(new Callback() {
                 @Override
                 public void onFailure(Call call, IOException e) {

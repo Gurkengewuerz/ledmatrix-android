@@ -115,11 +115,13 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                 connectBtn.setIcon(R.drawable.ic_play_arrow_black_24dp);
                 gamestatus.setGame("");
                 debugger.log("Disconnected");
+                gamestatus.setStatus(GameStatus.Status.WAIING);
             }
 
             public void onDeviceConnectionFailed() {
                 connectBtn.setIcon(R.drawable.ic_play_arrow_black_24dp);
                 debugger.log("Failed to connect to device");
+                gamestatus.setStatus(GameStatus.Status.WAIING);
             }
         });
 
@@ -149,7 +151,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                             }
 
                             String newAPIURL = jsonData.has("api_url") ? jsonData.getString("api_url") : "127.0.0.1";
-                            if(!apiURL.equals(newAPIURL)) {
+                            if (!apiURL.equals(newAPIURL)) {
                                 SharedPreferences save = getSharedPreferences("led-matrix-table", 0);
                                 apiURL = newAPIURL;
                                 save.edit().putString("api_url", newAPIURL).apply();
@@ -323,7 +325,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             final Spinner gameList = (Spinner) findViewById(R.id.gamelist);
 
             OkHttpClient client = new OkHttpClient();
-            Request request = new Request.Builder().url(apiURL).build();
+            Request request = new Request.Builder().url(apiURL + "/highscore").build();
             client.newCall(request).enqueue(new Callback() {
                 @Override
                 public void onFailure(Call call, IOException e) {
